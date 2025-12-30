@@ -1,0 +1,99 @@
+
+/* General Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+/* Header */
+header {
+    width: 100%;
+    background: #333;
+    color: white;
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* Navigation */
+nav ul {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+}
+
+nav ul li a {
+    text-decoration: none;
+    color: white;
+    font-size: 16px;
+    transition: 0.2s;
+}
+
+nav ul li a:hover {
+    color: #f0aa3c;
+}
+
+/* Login Button */
+.login-btn {
+    padding: 8px 15px;
+    background: #f0aa3c;
+    border-radius: 5px;
+    color: #000 !important;
+    font-weight: bold;
+}
+
+.login-btn:hover {
+    background: #e89a2b;
+}
+
+/* Mobile Menu Button */
+.menu-btn {
+    display: none;
+    font-size: 28px;
+    cursor: pointer;
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 768px) {
+    nav {
+        position: absolute;
+        top: 70px;
+        right: 0;
+        width: 100%;
+        background: #0e0d0d;
+        display: none;
+    }
+
+    nav.open {
+        display: block;
+    }
+
+    nav ul {
+        flex-direction: column;
+        text-align: center;
+        padding: 20px 0;
+    }
+
+    .menu-btn {
+        display: block;
+    }
+}
+.logo-img {
+    height: 60px;
+    object-fit: contain;
+}
+
+@media (max-width: 768px) {
+    .logo-img {
+        height: 45px;
+    }
+}
+
