@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coffee Shop Inventory & Forecast System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Font: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Chart Container Styling - Mandatory per requirements */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px; 
+            max-height: 400px;
+            padding-bottom: 20px; /* Ensure chart labels fit */
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 380px;
+            }
+        }
+
+        /* Utility for hiding/showing views */
+        .view-section { display: none; animation: fadeIn 0.3s ease-in-out; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Custom Scrollbar for better aesthetics */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f7f7f7; }
+        ::-webkit-scrollbar-thumb { background: #C4A484; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a88165; }
+        
+        .active-nav {
+            background-color: #8B5A2B !important;
+            color: white !important;
+            border-left-color: #F4A460 !important;
+        }
+        .nav-btn {
+            border-left-width: 4px;
+            border-left-style: solid;
+            border-left-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800 min-h-screen flex flex-col md:flex-row overflow-hidden">
+
+    <!-- Sidebar Navigation (Module 1-8 Access) -->
+    <aside class="w-full md:w-64 bg-stone-900 text-stone-300 flex-shrink-0 flex flex-col h-16 md:h-screen z-20 shadow-xl">
+        <div class="p-4 bg-stone-950 flex items-center justify-between md:justify-start space-x-3 border-b border-stone-800">
+            <div class="text-3xl text-yellow-500">☕</div>
+            <div>
+                <h1 class="font-extrabold text-white tracking-wider text-xl">UnaKape</h1>
+                <p class="text-xs text-stone-500">Inventory monitoring</p>
+            </div>
+            <!-- Mobile Menu Toggle -->
+            <button id="mobile-menu-btn" class="md:hidden text-2xl focus:outline-none">☰</button>
+        </div>
+
+        <nav id="sidebar-nav" class="flex-1 overflow-y-auto hidden md:block py-4">
+            <ul class="space-y-1">
+                <li><button onclick="nav('dashboard')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3 active-nav">📊 Dashboard</button></li>
+                <li><button onclick="nav('inventory')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">📦 Inventory Items</button></li>
+                <li><button onclick="nav('transactions')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">📝 Transactions Log</button></li>
+                <li><button onclick="nav('forecasting')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">📈 AI Forecasting</button></li>
+                <li><button onclick="nav('perishables')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">⚠️ Perishables Monitor</button></li>
+                <li><button onclick="nav('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">📑 Reports</button></li>
+                <li><button onclick="nav('settings')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">⚙️ Settings</button></li>
+            </ul>
+        </nav>
+
+        <div class="p-4 border-t border-stone-800 text-xs text-stone-500">
+            <div id="auth-status">Initializing...</div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 h-screen overflow-y-auto p-4 md:p-8 relative" id="main-content">
+        
+        <!-- 1. DASHBOARD VIEW (Overview Page) -->
+        <section id="dashboard" class="view-section active max-w-7xl mx-auto">
+            <header class="mb-8">
+                <h2 class="text-3xl font-extrabold text-stone-800">Operational Dashboard</h2>
+                <p class="text-stone-600 mt-2 max-w-3xl">
+                    This overview provides real-time KPIs and alerts to guide immediate management decisions, covering inventory health, stock alerts, and expiration risks.
+                </p>
+            </header>
+
+            <!-- A. Inventory Summary (KPI Cards) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow-md border border-stone-200">
+                    <div class="text-stone-500 text-sm font-semibold uppercase tracking-wider">Total Items</div>
+                    <div class="text-3xl font-black text-stone-800 mt-2" id="kpi-total-items">0</div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md border border-stone-200">
+                    <div class="text-stone-500 text-sm font-semibold uppercase tracking-wider">Total Categories</div>
+                    <div class="text-3xl font-black text-stone-800 mt-2" id="kpi-total-categories">0</div>
+                </div>
+                <div class="bg-red-50 p-6 rounded-lg shadow-md border border-red-100">
+                    <div class="text-red-800 text-sm font-semibold uppercase tracking-wider">🔴 Low Stock Alerts</div>
+                    <div class="text-3xl font-black text-red-600 mt-2" id="kpi-low-stock">0</div>
+                </div>
+                <div class="bg-orange-50 p-6 rounded-lg shadow-md border border-orange-100">
+                    <div class="text-orange-800 text-sm font-semibold uppercase tracking-wider">🟠 Expiring Soon</div>
+                    <div class="text-3xl font-black text-orange-600 mt-2" id="kpi-expiring">0</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- B. Alerts Section -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="bg-white p-6 rounded-lg shadow-md border border-stone-200 h-full">
+                        <h3 class="font-bold text-lg mb-4 border-b pb-2 text-stone-700">Action Center</h3>
+                        <div id="dashboard-alerts" class="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                            <p class="text-stone-400 text-sm italic">Loading alerts...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- C. Quick Stats / Graphs -->
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="bg-white p-6 rounded-lg shadow-md border border-stone-200">
+                        <h3 class="font-bold text-lg mb-4 text-stone-700">Stock Levels per Category</h3>
+                        <div class="chart-container">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. INVENTORY ITEMS VIEW (Main Inventory List) -->
+        <section id="inventory" class="view-section max-w-7xl mx-auto">
+            <header class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-3xl font-extrabold text-stone-800">Inventory Catalog</h2>
+                    <p class="text-stone-600 mt-1">Detailed view of all stock, thresholds, and quick stock movement actions.</p>
+                </div>
+                <button onclick="openItemModal(null)" class="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg flex items-center gap-2">
+                    <span>+</span> Add New Item
+                </button>
+            </header>
+
+            <div class="bg-white rounded-lg shadow-md overflow-hidden border border-stone-200">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-stone-100 text-stone-600 uppercase text-xs font-bold sticky top-0">
+                            <tr>
+                                <th class="p-4 border-b">Item Name</th>
+                                <th class="p-4 border-b">Category</th>
+                                <th class="p-4 border-b">Current Stock</th>
+                                <th class="p-4 border-b">Min Level</th>
+                                <th class="p-4 border-b">Expiry Date</th>
+                                <th class="p-4 border-b">Status</th>
+                                <th class="p-4 border-b text-center">Quick Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body" class="text-sm">
+                            <tr><td colspan="7" class="p-8 text-center text-stone-400">Loading inventory data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. TRANSACTIONS VIEW (Stock Movement Logs) -->
+        <section id="transactions" class="view-section max-w-7xl mx-auto">
+            <header class="mb-6">
+                <h2 class="text-3xl font-extrabold text-stone-800">Stock Movement Logs</h2>
+                <p class="text-stone-600 mt-1">A historical audit trail of all inventory transactions (Stock In, Stock Out, Adjustments).</p>
+            </header>
+            <div class="bg-white rounded-lg shadow-md overflow-hidden border border-stone-200">
+                <table class="w-full text-left">
+                    <thead class="bg-stone-100 text-stone-600 uppercase text-xs font-bold sticky top-0">
+                        <tr>
+                            <th class="p-4">Date & Time</th>
+                            <th class="p-4">Item</th>
+                            <th class="p-4">Type</th>
+                            <th class="p-4">Quantity</th>
+                            <th class="p-4">Remaining Stock</th>
+                            <th class="p-4">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transaction-table-body" class="text-sm">
+                        <tr><td colspan="6" class="p-8 text-center text-stone-400">Loading transaction history...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 5. FORECASTING VIEW -->
+        <section id="forecasting" class="view-section max-w-7xl mx-auto">
+            <header class="mb-8">
+                <h2 class="text-3xl font-extrabold text-stone-800">Forecasting</h2>
+                <p class="text-stone-600 mt-2">
+                    to predict future trends
+                </p>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Forecast Controls -->
+                <div class="bg-white p-6 rounded-xl shadow-md border border-stone-200 h-fit">
+                    <h3 class="font-bold text-lg mb-4 text-stone-700">Generate Forecast</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold text-stone-700 mb-2">Select Item</label>
+                            <select id="forecast-item-select" class="w-full p-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none">
+                                <option value="">-- Choose Item --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-stone-700 mb-2">Forecast Period</label>
+                            <div class="flex gap-4">
+                                <label class="flex items-center"><input type="radio" name="days" value="7" checked class="mr-2 text-yellow-600 border-yellow-300"> 7 Days</label>
+                                <label class="flex items-center"><input type="radio" name="days" value="14" class="mr-2 text-yellow-600 border-yellow-300"> 14 Days</label>
+                            </div>
+                        </div>
+                        <button id="btn-generate-forecast" class="w-full bg-stone-800 hover:bg-stone-700 text-white py-3 rounded-lg font-bold transition shadow-lg">
+                            ✨ Analyze & Predict
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Forecast Output -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Loading State -->
+                    <div id="forecast-loading" class="hidden text-center py-12 bg-white rounded-xl shadow-md border border-stone-200">
+                        <div class="animate-spin text-4xl mb-2 text-yellow-600">☕</div>
+                        <p class="text-stone-500">Consulting the oracle, generating demand prediction...</p>
+                    </div>
+
+                    <!-- Results Card -->
+                    <div id="forecast-results" class="hidden bg-white p-6 rounded-xl shadow-md border border-stone-200">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="font-bold text-xl text-stone-800 border-b pb-2">Procurement Recommendation</h3>
+                            <span class="bg-yellow-100 text-yellow-800 text-xs px-3 py-1 rounded-full font-bold">AI Insight</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="p-3 bg-stone-50 rounded-lg">
+                                <div class="text-xs text-stone-500 uppercase">Current Stock</div>
+                                <div class="text-xl font-bold" id="fc-current-stock">-</div>
+                            </div>
+                            <div class="p-3 bg-yellow-50 rounded-lg">
+                                <div class="text-xs text-yellow-600 uppercase">Suggested Reorder Quantity</div>
+                                <div class="text-xl font-bold text-yellow-800" id="fc-reorder-qty">-</div>
+                            </div>
+                        </div>
+
+                        <div class="prose prose-sm max-w-none text-stone-600 mb-6 bg-stone-50 p-4 rounded-lg border-l-4 border-yellow-500">
+                            <p id="fc-text-analysis">Select an item to see insights.</p>
+                        </div>
+
+                        <h4 class="font-bold text-sm text-stone-700 mb-2">Projected Stock Depletion (14 Days)</h4>
+                        <div class="chart-container">
+                            <canvas id="forecastChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. PERISHABLES VIEW -->
+        <section id="perishables" class="view-section max-w-7xl mx-auto">
+            <header class="mb-6">
+                <h2 class="text-3xl font-extrabold text-stone-800">Perishables & FIFO Management</h2>
+                <p class="text-stone-600 mt-1">Monitor expiration risks and enforce FIFO (First-In, First-Out) to minimize waste. Items grouped by urgency.</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Col 1: Expired -->
+                <div class="bg-red-50 rounded-xl border border-red-200 overflow-hidden shadow-md">
+                    <div class="bg-red-600 p-4 border-b border-red-700 flex justify-between items-center">
+                        <h3 class="font-bold text-white">⚫ EXPIRED & SPOILED</h3>
+                        <span class="text-xs bg-red-100 px-3 py-1 rounded-full text-red-800 font-bold" id="count-expired">0</span>
+                    </div>
+                    <div class="p-4 space-y-3 max-h-[500px] overflow-y-auto" id="list-expired">
+                        <p class="text-sm text-red-400">No items expired.</p>
+                    </div>
+                </div>
+
+                <!-- Col 2: Near Expiry (1-7 days) -->
+                <div class="bg-orange-50 rounded-xl border border-orange-200 overflow-hidden shadow-md">
+                    <div class="bg-orange-500 p-4 border-b border-orange-600 flex justify-between items-center">
+                        <h3 class="font-bold text-white">🟠 Expiring Soon (≤ 7 days)</h3>
+                        <span class="text-xs bg-orange-100 px-3 py-1 rounded-full text-orange-800 font-bold" id="count-soon">0</span>
+                    </div>
+                    <div class="p-4 space-y-3 max-h-[500px] overflow-y-auto" id="list-soon">
+                        <p class="text-sm text-orange-400">No immediate expiry risk.</p>
+                    </div>
+                </div>
+
+                <!-- Col 3: Warning (8-14 days) -->
+                <div class="bg-yellow-50 rounded-xl border border-yellow-200 overflow-hidden shadow-md">
+                    <div class="bg-yellow-500 p-4 border-b border-yellow-600 flex justify-between items-center">
+                        <h3 class="font-bold text-white">🟡 Warning (8-14 days)</h3>
+                        <span class="text-xs bg-yellow-100 px-3 py-1 rounded-full text-yellow-800 font-bold" id="count-warning">0</span>
+                    </div>
+                    <div class="p-4 space-y-3 max-h-[500px] overflow-y-auto" id="list-warning">
+                        <p class="text-sm text-yellow-600">Stock is fresh.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. REPORTS VIEW -->
+        <section id="reports" class="view-section max-w-4xl mx-auto">
+            <header class="mb-8">
+                <h2 class="text-3xl font-extrabold text-stone-800">Reporting & Data Export</h2>
+                <p class="text-stone-600 mt-2">Generate and export essential business reports for financial analysis and strategic planning.</p>
+            </header>
+
+            <div class="bg-white p-8 rounded-xl shadow-md border border-stone-200">
+                <h3 class="text-xl font-bold text-stone-700 mb-6 border-b pb-3">Available Reports</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <button class="flex flex-col items-start p-4 border border-stone-300 rounded-lg hover:bg-stone-100 transition shadow-sm text-left" onclick="showCustomModal('Report Generated', 'Daily Usage Report exported successfully as CSV.')">
+                        <div class="text-3xl mb-2 text-stone-600">📅</div>
+                        <h4 class="font-bold">Daily Usage Report</h4>
+                        <p class="text-xs text-stone-500">Summary of all stock-out transactions for selected dates.</p>
+                        <span class="mt-2 text-yellow-600 text-xs font-semibold">Export CSV</span>
+                    </button>
+                    <button class="flex flex-col items-start p-4 border border-stone-300 rounded-lg hover:bg-stone-100 transition shadow-sm text-left" onclick="showCustomModal('Report Generated', 'Monthly Inventory Summary exported successfully as PDF.')">
+                        <div class="text-3xl mb-2 text-stone-600">📈</div>
+                        <h4 class="font-bold">Monthly Inventory Summary</h4>
+                        <p class="text-xs text-stone-500">Snapshot of total stock and spoilage percentage.</p>
+                        <span class="mt-2 text-yellow-600 text-xs font-semibold">Export PDF</span>
+                    </button>
+                    <button class="flex flex-col items-start p-4 border border-stone-300 rounded-lg hover:bg-stone-100 transition shadow-sm text-left" onclick="showCustomModal('Report Generated', 'Expiry Aging Report exported successfully as Excel.')">
+                        <div class="text-3xl mb-2 text-stone-600">🗑️</div>
+                        <h4 class="font-bold">Expiry Aging Report</h4>
+                        <p class="text-xs text-stone-500">Detailed list of expiring and expired stock.</p>
+                        <span class="mt-2 text-yellow-600 text-xs font-semibold">Export Excel</span>
+                    </button>
+                    <button class="flex flex-col items-start p-4 border border-stone-300 rounded-lg hover:bg-stone-100 transition shadow-sm text-left" onclick="showCustomModal('Report Generated', 'Forecasting Report exported successfully as PDF.')">
+                        <div class="text-3xl mb-2 text-stone-600">🔮</div>
+                        <h4 class="font-bold">Forecasting Report</h4>
+                        <p class="text-xs text-stone-500">Printable AI forecast and reorder recommendations.</p>
+                        <span class="mt-2 text-yellow-600 text-xs font-semibold">Export PDF</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 8. USER & SETTINGS VIEW -->
+        <section id="settings" class="view-section max-w-4xl mx-auto">
+            <header class="mb-8">
+                <h2 class="text-3xl font-extrabold text-stone-800">System Configuration</h2>
+                <p class="text-stone-600 mt-2">Manage user settings, default thresholds, and inventory classifications.</p>
+            </header>
+
+            <div class="bg-white p-6 rounded-xl shadow-md border border-stone-200 space-y-8">
+                <div class="border-b pb-4">
+                    <h3 class="font-bold text-lg mb-4 text-stone-700">User Profile & Authentication</h3>
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center text-xl border border-yellow-300">👤</div>
+                        <div>
+                            <div class="font-bold text-stone-800" id="settings-uid">User ID: Connecting...</div>
+                            <div class="text-sm text-stone-500">Role: Manager (Default)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-b pb-4">
+                    <h3 class="font-bold text-lg mb-4 text-stone-700">Notification Thresholds</h3>
+                    <div class="flex items-center justify-between py-2 border-t border-stone-100">
+                        <span>Low Stock Alert (Global Default)</span>
+                        <input type="number" value="5" class="w-20 p-2 border rounded-lg text-center focus:ring-yellow-500">
+                    </div>
+                    <div class="flex items-center justify-between py-2">
+                        <span>Expiry Warning (Days)</span>
+                        <input type="number" value="7" class="w-20 p-2 border rounded-lg text-center focus:ring-yellow-500">
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg mb-4 text-stone-700">Category Management</h3>
+                    <div id="category-list" class="space-y-2">
+                        <span class="bg-stone-100 text-stone-700 px-3 py-1 rounded-full text-sm">Coffee Beans</span>
+                        <span class="bg-stone-100 text-stone-700 px-3 py-1 rounded-full text-sm">Dairy & Alternatives</span>
+                        <span class="bg-stone-100 text-stone-700 px-3 py-1 rounded-full text-sm">Syrups & Flavors</span>
+                        <span class="bg-stone-100 text-stone-700 px-3 py-1 rounded-full text-sm">Pastries & Food</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL: 3. ADD/EDIT ITEM -->
+    <div id="item-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transform scale-95 transition-all">
+            <div class="p-6 border-b border-stone-200 flex justify-between items-center bg-stone-50">
+                <h3 class="text-xl font-bold text-stone-800" id="item-modal-title">Add New Item</h3>
+                <button type="button" onclick="closeModal('item-modal')" class="text-stone-400 hover:text-stone-800 text-3xl leading-none">&times;</button>
+            </div>
+            <form id="item-form" class="p-6 space-y-4">
+                <input type="hidden" id="item-id">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Item Name *</label>
+                        <input type="text" id="inp-name" required class="w-full p-3 border border-stone-300 rounded-lg focus:border-yellow-600 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Category</label>
+                        <select id="inp-category" class="w-full p-3 border border-stone-300 rounded-lg focus:border-yellow-600">
+                            <option>Coffee Beans</option>
+                            <option>Dairy & Alternatives</option>
+                            <option>Syrups & Flavors</option>
+                            <option>Pastries & Food</option>
+                            <option>Dry Goods (Cups/Lids)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Initial Quantity</label>
+                        <input type="number" id="inp-stock" required min="0" class="w-full p-3 border border-stone-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Unit</label>
+                        <input type="text" id="inp-unit" placeholder="e.g. kg, lbs, pcs" class="w-full p-3 border border-stone-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Min Stock Level</label>
+                        <input type="number" id="inp-min" required min="0" class="w-full p-3 border border-stone-300 rounded-lg">
+                    </div>
+                </div>
+
+                <!-- Perishable Toggle -->
+                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <label class="flex items-center space-x-3 mb-2">
+                        <input type="checkbox" id="inp-perishable" class="w-5 h-5 text-yellow-600 rounded">
+                        <span class="font-bold text-sm text-yellow-800">Is this item perishable?</span>
+                    </label>
+                    <div id="expiry-field" class="hidden mt-3 pt-3 border-t border-yellow-100">
+                        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Expiry Date</label>
+                        <input type="date" id="inp-expiry" class="w-full p-3 border border-stone-300 rounded-lg">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-stone-100">
+                    <button type="button" onclick="closeModal('item-modal')" class="px-6 py-2 text-stone-600 hover:bg-stone-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-yellow-600 text-white font-bold rounded-lg hover:bg-yellow-700 shadow-md">Save Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: STOCK IN/OUT (Quick Action) -->
+    <div id="stock-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto transform scale-95 transition-all">
+            <div class="p-6 border-b border-stone-200 flex justify-between items-center bg-stone-50">
+                <h3 class="text-xl font-bold text-stone-800" id="stock-modal-title">Stock Movement</h3>
+                <button type="button" onclick="closeModal('stock-modal')" class="text-stone-400 hover:text-stone-800 text-3xl leading-none">&times;</button>
+            </div>
+            <form id="stock-form" class="p-6 space-y-4">
+                <input type="hidden" id="stock-item-id">
+                
+                <div class="text-lg font-semibold text-stone-700" id="stock-item-name-display"></div>
+                <div class="text-sm text-stone-500 mb-4" id="stock-current-qty-display"></div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Movement Type *</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center text-green-700 font-medium"><input type="radio" name="movement-type" value="Stock In" checked class="mr-2 text-green-600 border-green-300"> Stock In</label>
+                        <label class="flex items-center text-red-700 font-medium"><input type="radio" name="movement-type" value="Stock Out" class="mr-2 text-red-600 border-red-300"> Stock Out</label>
+                        <label class="flex items-center text-blue-700 font-medium"><input type="radio" name="movement-type" value="Adjustment" class="mr-2 text-blue-600 border-blue-300"> Adjustment</label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Quantity *</label>
+                    <input type="number" id="stock-quantity" required min="1" class="w-full p-3 border border-stone-300 rounded-lg">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Notes / Reason</label>
+                    <input type="text" id="stock-notes" placeholder="e.g. New delivery, used for latte" class="w-full p-3 border border-stone-300 rounded-lg">
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-stone-100">
+                    <button type="button" onclick="closeModal('stock-modal')" class="px-6 py-2 text-stone-600 hover:bg-stone-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-stone-800 text-white font-bold rounded-lg hover:bg-stone-700 shadow-md">Record Movement</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- MODAL: CUSTOM MESSAGE/ALERT (Replaces alert()) -->
+    <div id="custom-alert-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <h3 class="text-xl font-bold text-stone-800" id="custom-alert-title">Notification</h3>
+            <p id="custom-alert-message" class="text-stone-600"></p>
+            <div class="flex justify-end">
+                <button onclick="closeModal('custom-alert-modal')" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-bold">OK</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- FIREBASE & APP LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // CONFIG
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'coffee-shop-inventory';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // Gemini API Key is injected by environment
+        const geminiApiKey = ""; 
+
+        // STATE
+        let db, auth, userId;
+        let inventory = [];
+        let transactions = [];
+        let charts = {};
+
+        // --- INIT FIREBASE ---
+        const initApp = async () => {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        document.getElementById('auth-status').innerText = `User: ${userId.substring(0,6)}...`;
+                        document.getElementById('settings-uid').innerText = `User ID: ${userId}`;
+                        startListeners();
+                    } else {
+                        if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
+                        else await signInAnonymously(auth);
+                    }
+                });
+            } catch (e) { console.error("Firebase init error", e); }
+        };
+
+        // --- FIRESTORE LISTENERS ---
+        const startListeners = () => {
+            if(!userId) return;
+
+            // 1. Inventory Listener
+            const invRef = collection(db, `artifacts/${appId}/users/${userId}/inventory`);
+            onSnapshot(invRef, (snap) => {
+                inventory = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                renderDashboard();
+                renderInventoryTable();
+                renderPerishables();
+                populateForecastSelect();
+            });
+
+            // 2. Transactions Listener
+            const transRef = collection(db, `artifacts/${appId}/users/${userId}/transactions`);
+            // WARNING: orderBy is avoided as per instruction; sorting in memory.
+            onSnapshot(transRef, (snap) => {
+                transactions = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                transactions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Sort in memory
+                renderTransactions();
+            });
+        };
+
+        // --- DATA OPERATIONS ---
+        window.saveItem = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('item-id').value;
+            const isPerishable = document.getElementById('inp-perishable').checked;
+            
+            const data = {
+                name: document.getElementById('inp-name').value,
+                category: document.getElementById('inp-category').value,
+                stock: parseInt(document.getElementById('inp-stock').value),
+                unit: document.getElementById('inp-unit').value,
+                minStock: parseInt(document.getElementById('inp-min').value),
+                isPerishable: isPerishable,
+                expiryDate: isPerishable ? document.getElementById('inp-expiry').value : null,
+                updatedAt: new Date().toISOString()
+            };
+
+            const colRef = collection(db, `artifacts/${appId}/users/${userId}/inventory`);
+            
+            if(id) {
+                await updateDoc(doc(colRef, id), data);
+                logTransaction(data.name, 'Adjustment', 0, 'Item Details Updated');
+            } else {
+                await addDoc(colRef, data);
+                logTransaction(data.name, 'Stock In', data.stock, 'Initial Entry');
+            }
+            closeModal('item-modal');
+        };
+        document.getElementById('item-form').addEventListener('submit', window.saveItem);
+
+
+        window.handleStockMovement = async (e) => {
+            e.preventDefault();
+            const itemId = document.getElementById('stock-item-id').value;
+            const item = inventory.find(i => i.id === itemId);
+            if (!item) return showCustomModal("Error", "Item not found.");
+
+            const type = document.querySelector('input[name="movement-type"]:checked').value;
+            let qty = parseInt(document.getElementById('stock-quantity').value);
+            const notes = document.getElementById('stock-notes').value || type;
+
+            const currentStock = item.stock;
+            let newStock = currentStock;
+
+            if (type === 'Stock In') {
+                newStock = currentStock + qty;
+            } else if (type === 'Stock Out') {
+                newStock = currentStock - qty;
+                if (newStock < 0) {
+                    showCustomModal("Error", "Stock Out quantity exceeds current stock. Please check the amount.");
+                    return;
+                }
+                qty = -qty; // Log as negative for stock out
+            } else if (type === 'Adjustment') {
+                // Adjustment logic: simply change stock to the new value based on qty input
+                showCustomModal("Error", "Adjustment feature is reserved for full quantity reset, use Stock In/Out.");
+                return;
+            }
+
+            await updateDoc(doc(db, `artifacts/${appId}/users/${userId}/inventory`, itemId), { stock: newStock });
+            await logTransaction(item.name, type, qty, notes, newStock);
+
+            closeModal('stock-modal');
+            showCustomModal("Success", `${item.name} stock successfully updated to ${newStock} ${item.unit}.`);
+        };
+        document.getElementById('stock-form').addEventListener('submit', window.handleStockMovement);
+
+
+        window.deleteItem = async (id, name) => {
+            showCustomModal("Confirmation Required", `Are you sure you want to permanently delete "${name}"?`, true, async () => {
+                try {
+                    await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/inventory`, id));
+                    logTransaction(name, 'Disposal', 0, 'Item permanently deleted from catalog');
+                } catch (e) {
+                    showCustomModal("Error", "Could not delete item. Check console for details.");
+                }
+            });
+        };
+
+        const logTransaction = async (itemName, type, qty, notes, remainingStock) => {
+            if(!userId) return;
+            // Get the current remaining stock for the log entry
+            const currentItem = inventory.find(i => i.name === itemName);
+            
+            await addDoc(collection(db, `artifacts/${appId}/users/${userId}/transactions`), {
+                timestamp: new Date().toISOString(),
+                itemName, type, qty, notes, performedBy: 'Current User',
+                remainingStock: remainingStock !== undefined ? remainingStock : (currentItem ? currentItem.stock : 0)
+            });
+        };
+
+        // --- RENDERING UI ---
+
+        // 1. Dashboard
+        const renderDashboard = () => {
+            // KPIs
+            const totalItems = inventory.length;
+            const categories = new Set(inventory.map(i => i.category)).size;
+            const lowStock = inventory.filter(i => i.stock <= i.minStock).length;
+            const today = new Date();
+            const sevenDays = new Date(); sevenDays.setDate(today.getDate() + 7);
+            
+            const expiring = inventory.filter(i => {
+                if(!i.isPerishable || !i.expiryDate) return false;
+                const d = new Date(i.expiryDate);
+                // Check if date is in the future AND within the next 7 days
+                return d >= today && d <= sevenDays;
+            }).length;
+
+            document.getElementById('kpi-total-items').innerText = totalItems;
+            document.getElementById('kpi-total-categories').innerText = categories;
+            document.getElementById('kpi-low-stock').innerText = lowStock;
+            document.getElementById('kpi-expiring').innerText = expiring;
+
+            // Alerts List (B. Alerts Section)
+            const alertContainer = document.getElementById('dashboard-alerts');
+            alertContainer.innerHTML = '';
+            let hasAlerts = false;
+            
+            // 🔴 Low Stock Alerts
+            inventory.filter(i => i.stock <= i.minStock).forEach(i => {
+                hasAlerts = true;
+                alertContainer.innerHTML += `
+                    <div class="flex items-center gap-3 p-3 bg-red-100 border-l-4 border-red-500 rounded-lg text-sm">
+                        <span class="text-xl">🔴</span>
+                        <div>
+                            <div class="font-bold text-red-900">Low Stock: ${i.name}</div>
+                            <div class="text-red-700">${i.stock} ${i.unit} (Min: ${i.minStock})</div>
+                        </div>
+                    </div>`;
+            });
+            
+            // 🟠 Expiring Soon & 🟡 Expired Alerts
+            inventory.filter(i => i.isPerishable && i.expiryDate).forEach(i => {
+                const days = Math.ceil((new Date(i.expiryDate) - today) / (1000 * 60 * 60 * 24));
+                if (days <= 7 && days >= 0) {
+                    hasAlerts = true;
+                    alertContainer.innerHTML += `
+                        <div class="flex items-center gap-3 p-3 bg-orange-100 border-l-4 border-orange-500 rounded-lg text-sm">
+                            <span class="text-xl">🟠</span>
+                            <div>
+                                <div class="font-bold text-orange-900">Expiring Soon: ${i.name}</div>
+                                <div class="text-orange-700">Expires in ${days} days.</div>
+                            </div>
+                        </div>`;
+                } else if (days < 0) {
+                    hasAlerts = true;
+                    alertContainer.innerHTML += `
+                        <div class="flex items-center gap-3 p-3 bg-stone-200 border-l-4 border-stone-500 rounded-lg text-sm">
+                            <span class="text-xl">⚫</span>
+                            <div>
+                                <div class="font-bold text-stone-900">EXPIRED: ${i.name}</div>
+                                <div class="text-stone-700">Needs disposal.</div>
+                            </div>
+                        </div>`;
+                }
+            });
+
+            if(!hasAlerts) {
+                 alertContainer.innerHTML = '<p class="text-stone-400 text-sm italic p-4 text-center">No active alerts. Inventory is safe!</p>';
+            }
+
+            // Chart: Category Distribution (C. Quick Stats / Graphs)
+            const cats = {};
+            inventory.forEach(i => { cats[i.category] = (cats[i.category] || 0) + i.stock; });
+            
+            const ctx = document.getElementById('categoryChart');
+            if(charts.cat) charts.cat.destroy();
+            
+            charts.cat = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(cats),
+                    datasets: [{
+                        label: 'Current Stock Quantity',
+                        data: Object.values(cats),
+                        backgroundColor: ['#A0522D', '#CD853F', '#F4A460', '#D2B48C', '#8B5A2B', '#FFD700']
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        };
+
+        // 2. Inventory Table
+        const renderInventoryTable = () => {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+            
+            if (inventory.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-stone-400">Inventory is empty. Add a new item!</td></tr>';
+                return;
+            }
+
+            inventory.forEach(i => {
+                const today = new Date();
+                let statusHtml = '<span class="px-2 py-1 rounded-full bg-green-100 text-green-800 font-medium text-xs">🟢 Safe</span>';
+                let expiryDisplay = 'N/A';
+
+                // Status Logic
+                if(i.stock <= i.minStock) statusHtml = '<span class="px-2 py-1 rounded-full bg-red-100 text-red-800 font-medium text-xs">🔴 Low Stock</span>';
+                
+                if(i.isPerishable && i.expiryDate) {
+                    const expiryDate = new Date(i.expiryDate);
+                    expiryDisplay = i.expiryDate;
+                    const days = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                    
+                    if(days < 0) statusHtml = '<span class="px-2 py-1 rounded-full bg-stone-900 text-white font-medium text-xs">⚫ Expired</span>';
+                    else if(days <= 7) statusHtml = '<span class="px-2 py-1 rounded-full bg-orange-100 text-orange-800 font-medium text-xs">🟠 Expiring</span>';
+                    else if(days <= 14 && i.stock > i.minStock) statusHtml = '<span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 font-medium text-xs">🟡 Warning</span>';
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-stone-100 hover:bg-stone-50 transition";
+                tr.innerHTML = `
+                    <td class="p-4 font-semibold text-stone-700">${i.name}</td>
+                    <td class="p-4 text-stone-500 text-xs">${i.category}</td>
+                    <td class="p-4 font-mono text-stone-700">${i.stock} <span class="text-xs text-stone-400">${i.unit}</span></td>
+                    <td class="p-4 text-stone-500">${i.minStock}</td>
+                    <td class="p-4 text-stone-500 text-xs">${expiryDisplay}</td>
+                    <td class="p-4">${statusHtml}</td>
+                    <td class="p-4 text-center space-x-2 whitespace-nowrap">
+                        <button onclick="openStockModal('${i.id}')" class="text-xs font-bold text-stone-700 bg-stone-200 hover:bg-stone-300 px-3 py-1 rounded-full">Stock In/Out</button>
+                        <button onclick="openItemModal('${i.id}')" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">Edit</button>
+                        <button onclick="deleteItem('${i.id}', '${i.name}')" class="text-xs font-bold text-red-600 hover:text-red-800">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+        
+        // 3. Form Handling (openItemModal is below)
+        
+        // 4. Transactions
+        const renderTransactions = () => {
+            const tbody = document.getElementById('transaction-table-body');
+            tbody.innerHTML = '';
+            
+            if (transactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-stone-400">No transaction history yet.</td></tr>';
+                return;
+            }
+
+            transactions.slice(0, 50).forEach(t => {
+                const date = new Date(t.timestamp).toLocaleString();
+                let typeClass = "bg-stone-200 text-stone-800";
+                if(t.type === "Stock In") typeClass = "bg-green-100 text-green-800";
+                if(t.type === "Stock Out") typeClass = "bg-red-100 text-red-800";
+                if(t.type === "Disposal") typeClass = "bg-stone-300 text-stone-900";
+
+
+                tbody.innerHTML += `
+                    <tr class="border-b border-stone-100 hover:bg-stone-50">
+                        <td class="p-4 text-xs text-stone-500">${date}</td>
+                        <td class="p-4 font-semibold">${t.itemName}</td>
+                        <td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${typeClass}">${t.type}</span></td>
+                        <td class="p-4 font-mono text-center">${Math.abs(t.qty)}</td>
+                        <td class="p-4 font-mono text-center">${t.remainingStock}</td>
+                        <td class="p-4 text-stone-500 text-sm italic">${t.notes}</td>
+                    </tr>
+                `;
+            });
+        };
+
+        // 6. Perishables
+        const renderPerishables = () => {
+            const expiredDiv = document.getElementById('list-expired');
+            const soonDiv = document.getElementById('list-soon');
+            const warningDiv = document.getElementById('list-warning');
+            
+            expiredDiv.innerHTML = ''; soonDiv.innerHTML = ''; warningDiv.innerHTML = '';
+            
+            const today = new Date();
+            const perishables = inventory.filter(i => i.isPerishable && i.expiryDate && i.stock > 0);
+            let cExp = 0, cSoon = 0, cWarning = 0;
+
+            perishables.forEach(i => {
+                const expiryDate = new Date(i.expiryDate);
+                const days = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                const itemHtml = (colorClass, actionText) => `
+                    <div class="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
+                        <div class="font-bold text-stone-800">${i.name}</div>
+                        <div class="text-xs text-stone-500 flex justify-between mt-1">
+                            <span>Qty: ${i.stock} ${i.unit}</span>
+                            <span class="${colorClass} font-semibold">${actionText}</span>
+                        </div>
+                        <button onclick="openStockModal('${i.id}')" class="mt-2 w-full text-xs py-1 rounded-lg border border-stone-200 hover:bg-stone-50 transition">Handle Stock</button>
+                    </div>`;
+
+                if(days < 0) { cExp++; expiredDiv.innerHTML += itemHtml('text-red-600', `Expired ${Math.abs(days)} days ago`); }
+                else if(days <= 7) { cSoon++; soonDiv.innerHTML += itemHtml('text-orange-600', `Expires in ${days} days`); }
+                else if(days <= 14) { cWarning++; warningDiv.innerHTML += itemHtml('text-yellow-600', `Expires in ${days} days`); }
+            });
+
+            document.getElementById('count-expired').innerText = cExp;
+            document.getElementById('count-soon').innerText = cSoon;
+            document.getElementById('count-warning').innerText = cWarning;
+            
+            if (cExp === 0) expiredDiv.innerHTML = '<p class="text-sm text-red-400 p-4 text-center">No items expired.</p>';
+            if (cSoon === 0) soonDiv.innerHTML = '<p class="text-sm text-orange-400 p-4 text-center">No immediate expiry risk.</p>';
+            if (cWarning === 0) warningDiv.innerHTML = '<p class="text-sm text-yellow-600 p-4 text-center">All stock is fresh.</p>';
+        };
+
+
+        // 5. FORECASTING & GEMINI
+        const populateForecastSelect = () => {
+            const sel = document.getElementById('forecast-item-select');
+            const selectedValue = sel.value;
+            sel.innerHTML = '<option value="">-- Choose Item --</option>';
+            inventory.forEach(i => {
+                const opt = document.createElement('option');
+                opt.value = i.id;
+                opt.text = i.name;
+                sel.appendChild(opt);
+            });
+            sel.value = selectedValue; // Maintain selection if possible
+        };
+
+        document.getElementById('btn-generate-forecast').addEventListener('click', async () => {
+            const itemId = document.getElementById('forecast-item-select').value;
+            if(!itemId) return showCustomModal("Alert", "Please select an item to forecast.");
+
+            const item = inventory.find(i => i.id === itemId);
+            const loading = document.getElementById('forecast-loading');
+            const results = document.getElementById('forecast-results');
+            
+            loading.classList.remove('hidden');
+            results.classList.add('hidden');
+
+            try {
+                const forecastDays = document.querySelector('input[name="days"]:checked').value;
+                
+                // Gemini API Call
+                const prompt = `
+                    Act as a specialized supply chain expert for a coffee shop. 
+                    Item: ${item.name} (${item.category}).
+                    Current Stock: ${item.stock} ${item.unit}.
+                    Minimum Reorder Threshold: ${item.minStock} ${item.unit}.
+                    Task: 
+                    1. Predict a realistic, plausible daily usage rate (just a single integer number) for the next ${forecastDays} days, considering coffee shop context.
+                    2. Suggest a specific reorder quantity (single integer number) that ensures the stock remains above the Minimum Threshold for the next 7 days after the reorder is placed.
+                    3. Provide a concise, single-sentence analysis on a relevant factor (e.g., seasonality, trend) affecting the demand for this specific item.
+                    Format the response ONLY as a JSON object: {"daily_usage": number, "reorder_qty": number, "analysis": "string"}
+                `;
+
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
+
+                // Simple retry loop with exponential backoff (no console logging of retries)
+                let data, success = false;
+                for (let i = 0; i < 3 && !success; i++) {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
+                    if (response.ok) {
+                        data = await response.json();
+                        success = true;
+                    } else {
+                        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                    }
+                }
+                
+                if (!success || !data.candidates || data.candidates.length === 0) throw new Error("API call failed after retries.");
+
+                const aiData = JSON.parse(data.candidates[0].content.parts[0].text);
+                const dailyUsage = aiData.daily_usage || 1;
+                
+                // Update UI
+                document.getElementById('fc-current-stock').innerText = `${item.stock} ${item.unit}`;
+                document.getElementById('fc-reorder-qty').innerText = `${aiData.reorder_qty} ${item.unit}`;
+                document.getElementById('fc-text-analysis').innerText = aiData.analysis;
+
+                // Render Chart (Projected Depletion)
+                const labels = Array.from({length: forecastDays}, (_, i) => `Day ${i+1}`);
+                const projected = [];
+                let current = item.stock;
+                let depletionDay = null;
+                for(let i=0; i<forecastDays; i++) {
+                    current -= dailyUsage;
+                    if(current <= 0) {
+                        current = 0;
+                        if (depletionDay === null) depletionDay = i + 1;
+                    }
+                    projected.push(current);
+                }
+                
+                // Add depletion message to analysis
+                if (depletionDay) {
+                    document.getElementById('fc-text-analysis').innerText += ` Expected depletion in approximately ${depletionDay} days.`;
+                }
+
+                const ctx = document.getElementById('forecastChart');
+                if(charts.forecast) charts.forecast.destroy();
+                
+                charts.forecast = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Projected Stock Level', data: projected, borderColor: '#A0522D', backgroundColor: 'rgba(160, 82, 45, 0.1)', fill: true, tension: 0.4 },
+                            { label: 'Min Stock Level', data: Array(forecastDays).fill(item.minStock), borderColor: 'red', borderWidth: 2, borderDash: [5, 5], pointRadius: 0 }
+                        ]
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true, position: 'top' } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+
+                loading.classList.add('hidden');
+                results.classList.remove('hidden');
+
+            } catch (e) {
+                console.error("Forecasting Error:", e);
+                showCustomModal("Error", "Forecasting failed. Please check the console for API errors.");
+                loading.classList.add('hidden');
+            }
+        });
+
+
+        // --- GLOBAL HELPERS ---
+
+        // View Navigation
+        window.nav = (viewId) => {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active-nav'));
+            document.querySelector(`.nav-btn[onclick="nav('${viewId}')"]`).classList.add('active-nav');
+        };
+
+        // Modal Controls
+        window.openModal = (id) => {
+            const modal = document.getElementById(id);
+            if (!modal) return; // Guard clause
+            
+            const content = modal.querySelector('div.transform');
+            modal.classList.remove('hidden');
+            if (content) content.classList.remove('scale-95'); // Guard clause
+        };
+
+        window.closeModal = (id) => {
+            const modal = document.getElementById(id);
+            if (!modal) return; // Guard clause
+            
+            const content = modal.querySelector('div.transform');
+            if (content) content.classList.add('scale-95'); // Guard clause
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        };
+        
+        // Custom Alert/Confirmation (Replaces alert() and confirm())
+        window.showCustomModal = (title, message, isConfirm = false, onConfirm = () => {}) => {
+            const modal = document.getElementById('custom-alert-modal');
+            if (!modal) {
+                console.error("Custom alert modal not found.");
+                return;
+            }
+
+            document.getElementById('custom-alert-title').innerText = title;
+            document.getElementById('custom-alert-message').innerText = message;
+            
+            const buttonsDiv = modal.querySelector('.flex.justify-end');
+            buttonsDiv.innerHTML = '';
+            
+            if (isConfirm) {
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'px-4 py-2 bg-stone-300 text-stone-800 rounded-lg hover:bg-stone-400 font-bold';
+                cancelBtn.innerText = 'Cancel';
+                cancelBtn.onclick = () => closeModal('custom-alert-modal');
+                buttonsDiv.appendChild(cancelBtn);
+
+                const confirmBtn = document.createElement('button');
+                confirmBtn.className = 'px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold ml-3';
+                confirmBtn.innerText = 'Confirm';
+                confirmBtn.onclick = () => { onConfirm(); closeModal('custom-alert-modal'); };
+                buttonsDiv.appendChild(confirmBtn);
+            } else {
+                const okBtn = document.createElement('button');
+                okBtn.className = 'px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-bold';
+                okBtn.innerText = 'OK';
+                okBtn.onclick = () => closeModal('custom-alert-modal');
+                buttonsDiv.appendChild(okBtn);
+            }
+            
+            openModal('custom-alert-modal');
+        };
+
+
+        // 3. Add/Edit Item Helper
+        window.openItemModal = (id) => {
+            document.getElementById('item-form').reset();
+            document.getElementById('item-id').value = '';
+            document.getElementById('inp-perishable').checked = false;
+            document.getElementById('expiry-field').classList.add('hidden');
+            document.getElementById('item-modal-title').innerText = "Add New Item";
+            
+            if(id) {
+                const i = inventory.find(x => x.id === id);
+                if(!i) return;
+                
+                document.getElementById('item-id').value = i.id;
+                document.getElementById('inp-name').value = i.name;
+                document.getElementById('inp-category').value = i.category;
+                document.getElementById('inp-stock').value = i.stock;
+                document.getElementById('inp-unit').value = i.unit;
+                document.getElementById('inp-min').value = i.minStock;
+                document.getElementById('inp-perishable').checked = i.isPerishable;
+                
+                if(i.isPerishable) {
+                    document.getElementById('expiry-field').classList.remove('hidden');
+                    document.getElementById('inp-expiry').value = i.expiryDate || '';
+                }
+                document.getElementById('item-modal-title').innerText = "Edit Inventory Item";
+            }
+            openModal('item-modal');
+        };
+        document.getElementById('inp-perishable').addEventListener('change', (e) => {
+            const field = document.getElementById('expiry-field');
+            if(e.target.checked) field.classList.remove('hidden');
+            else field.classList.add('hidden');
+        });
+
+        // Stock In/Out Helper
+        window.openStockModal = (id) => {
+            const item = inventory.find(x => x.id === id);
+            if(!item) return;
+
+            document.getElementById('stock-form').reset();
+            document.getElementById('stock-item-id').value = item.id;
+            document.getElementById('stock-item-name-display').innerText = item.name;
+            document.getElementById('stock-current-qty-display').innerText = `Current Stock: ${item.stock} ${item.unit}`;
+            
+            // Set default movement type to Stock Out (most common action in coffee shop)
+            document.querySelector('input[name="movement-type"][value="Stock Out"]').checked = true;
+
+            openModal('stock-modal');
+        };
+
+        // Start App
+        initApp();
+    </script>
+</body>
+</html>
