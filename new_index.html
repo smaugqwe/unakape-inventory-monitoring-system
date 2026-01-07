@@ -425,19 +425,19 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Initial Quantity</label>
-                        <input type="number" id="inp-stock" required min="0" class="w-full p-3 border border-stone-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Unit</label>
-                        <input type="text" id="inp-unit" placeholder="e.g. kg, lbs, pcs" class="w-full p-3 border border-stone-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Min Stock Level</label>
-                        <input type="number" id="inp-min" required min="0" class="w-full p-3 border border-stone-300 rounded-lg">
-                    </div>
-                </div>
+    <div>
+        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Initial Quantity</label>
+        <input type="number" id="inp-stock" required min="0" class="w-full p-3 border border-stone-300 rounded-lg">
+    </div>
+    <div>
+        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Initial Batch/Lot #</label>
+        <input type="text" id="inp-batch-id" placeholder="e.g. LOT-001" class="w-full p-3 border border-stone-300 rounded-lg">
+    </div>
+    <div>
+        <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Unit</label>
+        <input type="text" id="inp-unit" placeholder="e.g. kg, lbs, pcs" class="w-full p-3 border border-stone-300 rounded-lg">
+    </div>
+</div>
 
                 <!-- Perishable Toggle -->
                 <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
@@ -482,22 +482,22 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Quantity *</label>
-                    <input type="number" id="stock-quantity" required min="1" class="w-full p-3 border border-stone-300 rounded-lg">
-                </div>
+    <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Quantity *</label>
+    <input type="number" id="stock-quantity" required min="1" class="w-full p-3 border border-stone-300 rounded-lg">
+</div>
 
-                <div>
-                    <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Notes / Reason</label>
-                    <input type="text" id="stock-notes" placeholder="e.g. New delivery, used for latte" class="w-full p-3 border border-stone-300 rounded-lg">
-                </div>
-
-                <div class="flex justify-end gap-3 pt-4 border-t border-stone-100">
-                    <button type="button" onclick="closeModal('stock-modal')" class="px-6 py-2 text-stone-600 hover:bg-stone-100 rounded-lg">Cancel</button>
-                    <button type="submit" class="px-6 py-2 bg-stone-800 text-white font-bold rounded-lg hover:bg-stone-700 shadow-md">Record Movement</button>
-                </div>
-            </form>
+<div id="stock-in-details" class="space-y-4 pt-2 border-t border-stone-100">
+    <div class="grid grid-cols-2 gap-4">
+        <div>
+            <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Batch / Lot #</label>
+            <input type="text" id="stock-batch-id" class="w-full p-3 border border-stone-300 rounded-lg" placeholder="Batch ID">
+        </div>
+        <div>
+            <label class="block text-xs font-bold uppercase text-stone-500 mb-1">Batch Expiry</label>
+            <input type="date" id="stock-expiry" class="w-full p-3 border border-stone-300 rounded-lg">
         </div>
     </div>
+</div>
     
     <!-- MODAL: CUSTOM MESSAGE/ALERT (Replaces alert()) -->
     <div id="custom-alert-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
@@ -578,19 +578,26 @@
         // --- DATA OPERATIONS ---
         window.saveItem = async (e) => {
             e.preventDefault();
-            const id = document.getElementById('item-id').value;
-            const isPerishable = document.getElementById('inp-perishable').checked;
-            
-            const data = {
-                name: document.getElementById('inp-name').value,
-                category: document.getElementById('inp-category').value,
-                stock: parseInt(document.getElementById('inp-stock').value),
-                unit: document.getElementById('inp-unit').value,
-                minStock: parseInt(document.getElementById('inp-min').value),
-                isPerishable: isPerishable,
-                expiryDate: isPerishable ? document.getElementById('inp-expiry').value : null,
-                updatedAt: new Date().toISOString()
-            };
+            // Inside saveItem function
+const initialQty = parseInt(document.getElementById('inp-stock').value);
+const batchId = document.getElementById('inp-batch-id').value || 'INITIAL';
+
+const data = {
+    name: document.getElementById('inp-name').value,
+    category: document.getElementById('inp-category').value,
+    totalStock: initialQty, // Changed from stock
+    unit: document.getElementById('inp-unit').value,
+    minStock: parseInt(document.getElementById('inp-min').value),
+    isPerishable: isPerishable,
+    // Store batches as an array of objects
+    batches: initialQty > 0 ? [{
+        batchId: batchId,
+        quantity: initialQty,
+        expiryDate: isPerishable ? document.getElementById('inp-expiry').value : null,
+        receivedDate: new Date().toISOString()
+    }] : [],
+    updatedAt: new Date().toISOString()
+};
 
             const colRef = collection(db, `artifacts/${appId}/users/${userId}/inventory`);
             
@@ -607,41 +614,90 @@
 
 
         window.handleStockMovement = async (e) => {
-            e.preventDefault();
-            const itemId = document.getElementById('stock-item-id').value;
-            const item = inventory.find(i => i.id === itemId);
-            if (!item) return showCustomModal("Error", "Item not found.");
+    e.preventDefault();
+    const itemId = document.getElementById('stock-item-id').value;
+    const item = inventory.find(i => i.id === itemId);
+    if (!item) return showCustomModal("Error", "Item not found.");
 
-            const type = document.querySelector('input[name="movement-type"]:checked').value;
-            let qty = parseInt(document.getElementById('stock-quantity').value);
-            const notes = document.getElementById('stock-notes').value || type;
+    const type = document.querySelector('input[name="movement-type"]:checked').value;
+    let qtyRequested = parseInt(document.getElementById('stock-quantity').value);
+    const notes = document.getElementById('stock-notes').value || type;
 
-            const currentStock = item.stock;
-            let newStock = currentStock;
+    // Ensure the item has a batches array (migration check)
+    let currentBatches = item.batches || [];
+    let newTotalStock = item.totalStock || 0;
 
-            if (type === 'Stock In') {
-                newStock = currentStock + qty;
-            } else if (type === 'Stock Out') {
-                newStock = currentStock - qty;
-                if (newStock < 0) {
-                    showCustomModal("Error", "Stock Out quantity exceeds current stock. Please check the amount.");
-                    return;
-                }
-                qty = -qty; // Log as negative for stock out
-            } else if (type === 'Adjustment') {
-                // Adjustment logic: simply change stock to the new value based on qty input
-                showCustomModal("Error", "Adjustment feature is reserved for full quantity reset, use Stock In/Out.");
-                return;
-            }
-
-            await updateDoc(doc(db, `artifacts/${appId}/users/${userId}/inventory`, itemId), { stock: newStock });
-            await logTransaction(item.name, type, qty, notes, newStock);
-
-            closeModal('stock-modal');
-            showCustomModal("Success", `${item.name} stock successfully updated to ${newStock} ${item.unit}.`);
+    if (type === 'Stock In') {
+        // 1. Logic for adding a new batch
+        const batchId = document.getElementById('stock-batch-id').value || `B-${Date.now()}`;
+        const expiry = document.getElementById('stock-expiry').value || null;
+        
+        const newBatch = {
+            batchId: batchId,
+            quantity: qtyRequested,
+            expiryDate: expiry,
+            receivedDate: new Date().toISOString()
         };
+        
+        currentBatches.push(newBatch);
+        newTotalStock += qtyRequested;
+
+    } else if (type === 'Stock Out') {
+        // 2. FIFO Logic for removing stock
+        if (newTotalStock < qtyRequested) {
+            return showCustomModal("Error", "Insufficient total stock across all batches.");
+        }
+
+        let remainingToDeduct = qtyRequested;
+        newTotalStock -= qtyRequested;
+
+        // Sort batches by receivedDate to ensure we take from the oldest first
+        currentBatches.sort((a, b) => new Date(a.receivedDate) - new Date(b.receivedDate));
+
+        for (let i = 0; i < currentBatches.length; i++) {
+            if (remainingToDeduct <= 0) break;
+
+            let batch = currentBatches[i];
+            if (batch.quantity <= remainingToDeduct) {
+                // Consume this entire batch
+                remainingToDeduct -= batch.quantity;
+                batch.quantity = 0;
+            } else {
+                // Partially consume this batch
+                batch.quantity -= remainingToDeduct;
+                remainingToDeduct = 0;
+            }
+        }
+
+        // Clean up: Remove batches that are now empty (0 quantity)
+        currentBatches = currentBatches.filter(b => b.quantity > 0);
+    }
+
+    // 3. Update Firestore with the new array and total
+    await updateDoc(doc(db, `artifacts/${appId}/users/${userId}/inventory`, itemId), { 
+        batches: currentBatches,
+        totalStock: newTotalStock,
+        updatedAt: new Date().toISOString()
+    });
+
+    await logTransaction(item.name, type, qtyRequested, notes, newTotalStock);
+
+    closeModal('stock-modal');
+    showCustomModal("Success", `${item.name} updated. Total remaining: ${newTotalStock} ${item.unit}.`);
+};
         document.getElementById('stock-form').addEventListener('submit', window.handleStockMovement);
 
+        // Add this near your other event listeners
+document.querySelectorAll('input[name="movement-type"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        const batchDetails = document.getElementById('stock-in-details');
+        if (e.target.value === 'Stock In') {
+            batchDetails.classList.remove('hidden');
+        } else {
+            batchDetails.classList.add('hidden');
+        }
+    });
+});
 
         window.deleteItem = async (id, name) => {
             showCustomModal("Confirmation Required", `Are you sure you want to permanently delete "${name}"?`, true, async () => {
