@@ -73,7 +73,7 @@
                 <li><button onclick="nav('dashboard')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3 active-nav">📊 Dashboard</button></li>
                 <li><button onclick="nav('inventory')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">📦 Inventory Items</button></li>
                 <li><button onclick="nav('transactions')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">📝 Transactions Log</button></li>
-                <li><button onclick="nav('forecasting')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">📈 AI Forecasting</button></li>
+                <li><button onclick="nav('forecasting')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">📈 Demand Forecasting</button></li>
                 <li><button onclick="nav('perishables')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">⚠️ Perishables Monitor</button></li>
                 <li><button onclick="nav('reports')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">📑 Reports</button></li>
                 <li><button onclick="nav('settings')" class="nav-btn w-full text-left px-6 py-3 hover:bg-stone-800 hover:text-white transition-colors flex items-center gap-3">⚙️ Settings</button></li>
@@ -729,7 +729,7 @@ document.querySelectorAll('input[name="movement-type"]').forEach(radio => {
             // KPIs
             const totalItems = inventory.length;
             const categories = new Set(inventory.map(i => i.category)).size;
-            const lowStock = inventory.filter(i => i.stock <= i.minStock).length;
+            const lowStock = inventory.filter(i => i.totalstock <= i.minStock).length;
             const today = new Date();
             const sevenDays = new Date(); sevenDays.setDate(today.getDate() + 7);
             
@@ -751,7 +751,7 @@ document.querySelectorAll('input[name="movement-type"]').forEach(radio => {
             let hasAlerts = false;
             
             // 🔴 Low Stock Alerts
-            inventory.filter(i => i.stock <= i.minStock).forEach(i => {
+            inventory.filter(i => i.totalstock <= i.minStock).forEach(i => {
                 hasAlerts = true;
                 alertContainer.innerHTML += `
                     <div class="flex items-center gap-3 p-3 bg-red-100 border-l-4 border-red-500 rounded-lg text-sm">
@@ -835,7 +835,7 @@ document.querySelectorAll('input[name="movement-type"]').forEach(radio => {
                 let expiryDisplay = 'N/A';
 
                 // Status Logic
-                if(i.stock <= i.minStock) statusHtml = '<span class="px-2 py-1 rounded-full bg-red-100 text-red-800 font-medium text-xs">🔴 Low Stock</span>';
+                if(i.totalstock <= i.minStock) statusHtml = '<span class="px-2 py-1 rounded-full bg-red-100 text-red-800 font-medium text-xs">🔴 Low Stock</span>';
                 
                 if(i.isPerishable && i.expiryDate) {
                     const expiryDate = new Date(i.expiryDate);
@@ -908,7 +908,7 @@ document.querySelectorAll('input[name="movement-type"]').forEach(radio => {
             expiredDiv.innerHTML = ''; soonDiv.innerHTML = ''; warningDiv.innerHTML = '';
             
             const today = new Date();
-            const perishables = inventory.filter(i => i.isPerishable && i.expiryDate && i.stock > 0);
+            const perishables = inventory.filter(i => i.isPerishable && i.expiryDate && i.totalstock > 0);
             let cExp = 0, cSoon = 0, cWarning = 0;
 
             perishables.forEach(i => {
@@ -918,7 +918,7 @@ document.querySelectorAll('input[name="movement-type"]').forEach(radio => {
                     <div class="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
                         <div class="font-bold text-stone-800">${i.name}</div>
                         <div class="text-xs text-stone-500 flex justify-between mt-1">
-                            <span>Qty: ${i.stock} ${i.unit}</span>
+                            <span>Qty: ${i.totalstock} ${i.unit}</span>
                             <span class="${colorClass} font-semibold">${actionText}</span>
                         </div>
                         <button onclick="openStockModal('${i.id}')" class="mt-2 w-full text-xs py-1 rounded-lg border border-stone-200 hover:bg-stone-50 transition">Handle Stock</button>
@@ -971,7 +971,7 @@ document.querySelectorAll('input[name="movement-type"]').forEach(radio => {
                 const prompt = `
                     Act as a specialized supply chain expert for a coffee shop. 
                     Item: ${item.name} (${item.category}).
-                    Current Stock: ${item.stock} ${item.unit}.
+                    Current Stock: ${item.totalstock} ${item.unit}.
                     Minimum Reorder Threshold: ${item.minStock} ${item.unit}.
                     Task: 
                     1. Predict a realistic, plausible daily usage rate (just a single integer number) for the next ${forecastDays} days, considering coffee shop context.
@@ -1014,7 +1014,7 @@ document.querySelectorAll('input[name="movement-type"]').forEach(radio => {
                 // Render Chart (Projected Depletion)
                 const labels = Array.from({length: forecastDays}, (_, i) => `Day ${i+1}`);
                 const projected = [];
-                let current = item.stock;
+                let current = item.totalstock;
                 let depletionDay = null;
                 for(let i=0; i<forecastDays; i++) {
                     current -= dailyUsage;
@@ -1144,7 +1144,7 @@ document.querySelectorAll('input[name="movement-type"]').forEach(radio => {
                 document.getElementById('item-id').value = i.id;
                 document.getElementById('inp-name').value = i.name;
                 document.getElementById('inp-category').value = i.category;
-                document.getElementById('inp-stock').value = i.stock;
+                document.getElementById('inp-stock').value = i.totalstock;
                 document.getElementById('inp-unit').value = i.unit;
                 document.getElementById('inp-min').value = i.minStock;
                 document.getElementById('inp-perishable').checked = i.isPerishable;
@@ -1171,7 +1171,7 @@ document.querySelectorAll('input[name="movement-type"]').forEach(radio => {
             document.getElementById('stock-form').reset();
             document.getElementById('stock-item-id').value = item.id;
             document.getElementById('stock-item-name-display').innerText = item.name;
-            document.getElementById('stock-current-qty-display').innerText = `Current Stock: ${item.stock} ${item.unit}`;
+            document.getElementById('stock-current-qty-display').innerText = `Current Stock: ${item.totalstock} ${item.unit}`;
             
             // Set default movement type to Stock Out (most common action in coffee shop)
             document.querySelector('input[name="movement-type"][value="Stock Out"]').checked = true;
